@@ -247,3 +247,255 @@ public class HelloController
 
 访问端口 http://localhost:8004/hello3 ，返回的结果，你会很清楚的看见两个端口来回切换。
 
+## RestTemplate调用服务
+
+一、把RestTemplate注册到spring容器中
+
+```java
+    @Bean
+    public RestTemplate restTemplateOne()
+    {
+        return new RestTemplate();
+    }
+
+    @Bean
+    @LoadBalanced //开启负载均衡，默认算法为轮询
+    public RestTemplate restTemplate()
+    {
+        return new RestTemplate();
+    }
+```
+
+二、在客户端的控制器里调用服务端接口
+
+```java
+	@Autowired
+    @Qualifier("restTemplateOne") //作区分的，基础东西，不解释
+    RestTemplate restTemplateOne;    
+	@GetMapping("/hello2")
+    public String hello2()
+    {
+        //他返回的是一个list集合，因为你有可能是集群化部署。
+        final List<ServiceInstance> provider = discoveryClient.getInstances("provider");
+        final ServiceInstance serviceInstance = provider.get(0);
+        final String host = serviceInstance.getHost();//host主机名
+        final int port = serviceInstance.getPort();//端口名
+        final StringBuffer stringBuffer = new StringBuffer();
+        stringBuffer.append("http://")
+                .append(host)
+                .append(":")
+                .append(port)
+                .append("/hello");
+
+        final String s = restTemplateOne.getForObject(stringBuffer.toString(), String.class);
+        return s;
+    }
+```
+
+轮询调用
+
+```java
+    @GetMapping("/hello3")
+    public String hello3()
+    {
+        return restTemplate.getForObject("http://provider/hello", String.class);
+    }
+```
+
+会发现，实现效果都一样，但是代码量明显小了很多。
+
+> 这里我为什么要定义两个bean呢？这两个RestTemplate是不一样的，其中一个调用的是Http的服务，另一个调用的是注册中心的服务，混用的话，解析provider的时候会出错。
+
+### Get
+
+一、首先要在`provider`中定义一个接口
+
+```java
+	@GetMapping("/hello2")
+    public String hello2(String name)
+    {
+        return name;
+    }
+```
+
+二、然后在`consumer`中调用
+
+```java
+    @GetMapping("/hello4")
+    public void hello4()
+    {
+        final String s = restTemplate.getForObject("http://provider/hello2?name={1}",
+                String.class,"leo");
+        System.out.println(s);
+        final ResponseEntity<String> s1 = restTemplate.getForEntity("http://provider/hello2?name={1}",String.class, "leo");
+        final String body = s1.getBody();
+        System.out.println(body);
+        final HttpStatus statusCode = s1.getStatusCode();
+        System.out.println(statusCode);
+    }
+//-------控制台打印结果---------
+//leo
+//leo
+//200 OK
+```
+
+> 这里有一个注意的地方，getForObject和getForEntity传参的时候，用数字做一种类似于占位符的一种
+
+```java
+        String s;
+        HashMap<String, Object> map = new HashMap<>();
+        map.put("name", "张三");
+        s = restTemplate.getForObject("http://provider/hello2?name={name}",
+                String.class, map);
+//另一种传参方式
+```
+
+### Post
+
+一、首先添加一个commons模块，然后分别被provider和consumer两个模块所引用
+
+二、`provider`提供两个接口
+
+```java
+    @PostMapping("/user1")	//key/value形式传参
+    public User addUser1(User user){
+        return user;
+    }
+
+    @PostMapping("/user2") //json形式传参
+    public User addUser2(@RequestBody User user){
+        return user;
+    }
+```
+
+三、`consumer`消费者
+
+```java
+	 @GetMapping("/hello5")
+    public void hello5()
+    {
+        LinkedMultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
+        map.add("username","leo");
+        map.add("password","123");
+        map.add("id",1);
+        User user = restTemplate.postForObject("http://provider/user1", map, User.class);
+        System.out.println(user);
+
+        user.setId(2);
+        user.setUsername("zhbcm");
+        user.setPassword("123");
+        user = restTemplate.postForObject("http://provider/user2", user, User.class);
+        System.out.println(user);
+    }
+```
+
+一次请求，返回两个post请求的结果
+
+**测试使用postForLocation**
+
+一、`provider`提供一个RegisterController
+
+```java
+@Controller
+public class RegisterController
+{
+    @PostMapping("/register")
+    public String register(User user){
+        return "redirect:http://provider/loginPage?username="+user.getUsername();
+    }
+
+    @GetMapping("/loginPage")
+    @ResponseBody
+    public String loginPage(String username){
+        return "login"+username;
+    }
+
+```
+
+> 1.因为这里是重定向，响应结果一定是302，否则postForLocation无效
+>
+> 2.重定向的路径要写成绝对路径，否则consumer中调用会出错
+
+二、`consumer`调用
+
+```java
+    @GetMapping("/hello6")
+    public void hello6(){
+        LinkedMultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
+        map.add("username","leo");
+        map.add("password","123");
+        map.add("id",1);
+        URI user = restTemplate.postForLocation("http://provider/register", map);
+        String s = restTemplate.getForObject(user, String.class);
+        System.out.println(s);
+    }
+```
+
+### Put
+
+put接口传参其实和post很像也是支持kv形式传参和json形式传参
+
+`provider`提供端
+
+```java
+    @PutMapping("/updateUser1")
+    public void updateUser1(User user)
+    {
+        System.out.println(user);
+    }
+
+    @PutMapping("/updateUser2")
+    public void updateUser2(@RequestBody User user)
+    {
+        System.out.println(user);
+    }
+```
+
+`consumer`调用端
+
+```java
+	@GetMapping("/hello7")
+    public void hello7(){
+        LinkedMultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
+        map.add("username","leo");
+        map.add("password","123");
+        map.add("id",1);
+        restTemplate.put("http://provider/updateUser1", map);
+        //System.out.println(user);
+        User user = new User();
+        user.setId(2);
+        user.setUsername("zhbcm");
+        user.setPassword("123");
+        restTemplate.put("http://provider/updateUser2", user);
+        //System.out.println(user);
+    }
+```
+
+### Delete
+
+`provider`提供端
+
+```java
+    @DeleteMapping("/deleteUser1")
+    public void deleteUser1(Integer id)
+    {
+        System.out.println(id);
+    }
+
+    @DeleteMapping("/deleteUser2/{id}")
+    public void deleteUser2(@PathVariable Integer id)
+    {
+        System.out.println(id);
+    }
+```
+
+`consumer`消费者端
+
+```java
+    @GetMapping("/hello8")
+    public void hello8(){
+       restTemplate.delete("http://provider/deleteUser1?id={1}",1);
+       restTemplate.delete("http://provider/deleteUser2/{1}",2);
+    }
+```
+
