@@ -10,6 +10,7 @@
         <option value="$PROJECT_DIR$/Consumer/pom.xml" />
         <option value="$PROJECT_DIR$/Consul-Provider/pom.xml" />
         <option value="$PROJECT_DIR$/Consul-Consumer/pom.xml" />
+        <option value="$PROJECT_DIR$/Hystrix/pom.xml" />
       </list>
     </option>
   </component>

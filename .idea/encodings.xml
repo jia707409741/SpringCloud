@@ -5,6 +5,7 @@
     <file url="file://$PROJECT_DIR$/Consul-Provider" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/Consumer" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/Eureka" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Hystrix" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/Provider" charset="UTF-8" />
   </component>
 </project>

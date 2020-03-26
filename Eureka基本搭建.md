@@ -665,3 +665,483 @@ public class HelloController
 
 ![1585201110514](Eureka基本搭建.assets/1585201110514.png)
 
+## Hystrix
+
+### Hystrix基本介绍
+
+> Hystrix叫做熔断器，在微服务系统中，一个项目可能会牵涉多个系统，任何一个模块出错可能会导致整个系统出问题。所以我们希望可以有一样东西，如果某一个模块出错，不再影响整个系统！
+
+### Hystrix基本使用
+
+一、添加依赖
+
+```xml
+		<dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+        </dependency>
+
+```
+
+二、添加配置
+
+```properties
+spring.application.name=hystrix
+server.port=8009
+eureka.client.service-url.defaultZone=http://localhost:8001/eureka
+
+```
+
+三、启动类配置
+
+```java
+@SpringBootApplication
+@EnableCircuitBreaker
+//@SpringCloudApplication可以使用这个注解来代替、
+
+public class HystrixApplication
+{
+    public static void main(String[] args)
+    {
+        SpringApplication.run(HystrixApplication.class, args);
+    }
+
+    @Bean
+    @LoadBalanced
+    RestTemplate restTemplate()
+    {
+        return new RestTemplate();
+    }
+}
+```
+
+> 关于@SpringCloudApplication解释，他和@SpringBootApplication差不多，是一种复合注解，其源码如下：
+
+```java
+@Target({ElementType.TYPE})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Inherited
+@SpringBootApplication
+@EnableDiscoveryClient
+@EnableCircuitBreaker
+public @interface SpringCloudApplication {
+}
+```
+
+可以看出这个注解是@SpringBootApplication、@EnableDiscoveryClient、@EnableCircuitBreaker三个注解的组合。
+
+四、核心代码
+
+HelloService.java
+
+```java
+@Service
+public class HelloService
+{
+    @Autowired
+    RestTemplate restTemplate;
+
+    /**
+     * 我们将调用provider里的hello接口，但是这个调用可能会失败，所以我们要在这个方法上加上
+     * @HystrixCommand注解，配置里面fallbackMethod的属性，表示调用该方法失败时，会调用临时
+     * 的一个替代方法。
+     */
+    @HystrixCommand(fallbackMethod = "error")//服务降级
+    public String hello()
+    {
+        return restTemplate.getForObject("http://provider/hello", String.class);
+    }
+    /**
+     * @description：
+     * 名字要和fallbackMethod返回值一致，方法返回值也要一致。总不能上面失败的方法返回是String类型
+     * 你下面定义的临时调用方法返回Integer类型，这显然是不行的。
+     * @since v1.0.0
+     * author Leo
+     * date 2020/3/26
+     */
+    public String error()
+    {
+        return "error";
+    }
+}
+```
+
+HelloController.java
+
+```java
+@RestController
+public class HelloController
+{
+    @Autowired
+    HelloService helloService;
+
+    @GetMapping("/hello")
+    public String hello(){
+        return helloService.hello();
+    }
+}
+
+```
+
+最后，测试的时候如果出现问题的话，会出现error。
+
+### Hystrix请求命令
+
+一、创建Command.java继承HystrixCommand<T>
+
+```java
+public class Command extends HystrixCommand<String>
+{
+    RestTemplate restTemplate;
+
+    public Command(Setter setter, RestTemplate restTemplate)
+    {
+        super(setter);
+        this.restTemplate = restTemplate;
+    }
+
+    @Override
+    protected String run() throws Exception
+    {
+        return restTemplate.getForObject("http://provider/hello",String.class);
+    }
+}
+```
+
+二、调用方法
+
+```java
+    @Autowired
+    RestTemplate restTemplate;
+
+    @GetMapping("/hello2")
+    public void hello2(){
+        Command command = new Command(HystrixCommand.Setter.
+                withGroupKey(HystrixCommandGroupKey.Factory.asKey("leo")), restTemplate);
+//        String execute = command.execute();//直接执行
+//        System.out.println(execute);
+        try
+        {
+            Future<String> queue = command.queue();
+            String s = queue.get();
+            System.out.println(s);//先入队后执行
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+        catch (ExecutionException e)
+        {
+            e.printStackTrace();
+        }
+    }
+```
+
+> 这里一个实例只能执行一次，所以如果通过execute方法执行，就不要使用queue。
+
+### Hystrix注解方式异步调用
+
+首先定义如下方法
+
+```java
+    @HystrixCommand(fallbackMethod = "error")
+    public Future<String> hello2(){
+        return new AsyncResult<String>(){
+            @Override
+            public String invoke()
+            {
+                return restTemplate.getForObject("http://provider/hello",String.class);
+            }
+        };
+    }
+```
+
+调用方法
+
+```java
+   @GetMapping("/hello3")
+    public void hello3(){
+        Future<String> future = helloService.hello2();
+        try
+        {
+            String s = future.get();
+            System.out.println(s);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+        catch (ExecutionException e)
+        {
+            e.printStackTrace();
+        }
+    }
+```
+
+### Hystrix请求缓存
+
+一、首先修改`provider`的hello2接口
+
+```java
+    @GetMapping("/hello2")
+    public String hello2(String name)
+    {
+        System.out.println(new Date()+"--->"+name);
+        return name;
+    }
+```
+
+二、在断路器中添加代码
+
+HelloService.java
+
+```java
+    @HystrixCommand(fallbackMethod = "error2")
+    @CacheResult //这个注解表示该方法的请求结果会被缓存起来，缓存key就是参数，value就是方法的返回值
+    public String hello3(String name){
+        return restTemplate.getForObject("http://provider/hello2?name={1}",String.class,name);
+    }
+
+    public String error2(String name)
+    {
+        return "error"+name;
+    }
+```
+
+> 然而，这样配置完成之后，缓存并不会立即生效，一般来说缓存都有一个生命周期，所以这里也是，需要进行初始化HystrixRequestContext，才可以生效。close之后缓存失效。
+
+```java
+    @GetMapping("/hello4")
+    public void hello4(){
+        HystrixRequestContext ctx = HystrixRequestContext.initializeContext();
+        String s = helloService.hello3("leo");
+        s = helloService.hello3("leo");
+        ctx.close();
+    }
+```
+
+发起请求： http://localhost:8009/hello4 
+
+`返回结果：`Thu Mar 26 17:18:10 CST 2020--->leo
+
+他只返回了一次，说明第二次返回的结果是读取第一次的缓存。
+
+### Hystrix请求合并
+
+*非注解形式，配置复杂！*
+
+`provider`接口定义
+
+```java
+@RestController
+public class UserController
+{
+    @GetMapping("/user/{ids}")
+    public List<User> getUserByIds(@PathVariable String ids){
+        System.out.println(ids);
+        String[] split = ids.split(",");
+        ArrayList<User> list = new ArrayList<>();
+        for (String s : split)
+        {
+            User user = new User();
+            user.setId(Integer.parseInt(s));
+            list.add(user);
+        }
+        return list;
+    }
+}
+```
+
+在`hystrix`定义UserService
+
+```java
+@Service
+public class UserService
+{
+    @Autowired
+    RestTemplate restTemplate;
+    public List<User> getUserByIds(List<Integer> ids){
+        User[] users = restTemplate.getForObject("http://provider/user/{1}", User[].class, StringUtils.join(ids, ','));
+        return Arrays.asList(users);
+    }
+}
+
+```
+
+定义UserBatchCommand
+
+```java
+public class UserBatchCommand extends HystrixCommand<List<User>>
+{
+    private List<Integer> ids;
+    private UserService userService;
+
+    @Override
+    protected List<User> run() throws Exception
+    {
+        return userService.getUserByIds(ids);
+    }
+
+    public UserBatchCommand(List<Integer> ids, UserService userService)
+    {
+        super(HystrixCommand.Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("batchCmd"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey("batchKey")));
+        this.ids = ids;
+        this.userService = userService;
+    }
+}
+
+```
+
+定义请求合并的方法
+
+```java
+public class UserCollapseCommand extends HystrixCollapser<List<User>, User, Integer>
+{
+    private UserService userService;
+    private Integer id;
+
+    public UserCollapseCommand(UserService userService, Integer id)
+    {
+        super(HystrixCollapser.Setter.withCollapserKey(HystrixCollapserKey.Factory.asKey("UserCollapseCommand"))
+                .andCollapserPropertiesDefaults(HystrixCollapserProperties.Setter()
+                        .withTimerDelayInMilliseconds(200)));
+        this.userService = userService;
+        this.id = id;
+    }
+
+    //返回请求参数
+    @Override
+    public Integer getRequestArgument()
+    {
+        return id;
+    }
+
+    //请求合并方法
+    @Override
+    protected HystrixCommand<List<User>> createCommand(Collection<CollapsedRequest<User, Integer>> collection)
+    {
+        ArrayList<Integer> ids = new ArrayList<>(collection.size());
+        for (CollapsedRequest<User, Integer> request : collection)
+        {
+            ids.add(request.getArgument());
+        }
+        return new UserBatchCommand(ids,userService);
+    }
+
+    //请求结果分发
+    @Override
+    protected void mapResponseToRequests(List<User> users, Collection<CollapsedRequest<User, Integer>> collection)
+    {
+        int count=0;
+        for (CollapsedRequest<User, Integer> request : collection)
+        {
+            request.setResponse(users.get(count++));
+        }
+    }
+}
+
+```
+
+最后调试
+
+```java
+@GetMapping("/hello5")
+    public void hello5() throws ExecutionException, InterruptedException
+    {
+        HystrixRequestContext ctx = HystrixRequestContext.initializeContext();
+        UserCollapseCommand cmd1 = new UserCollapseCommand(userService, 99);
+        UserCollapseCommand cmd2 = new UserCollapseCommand(userService, 98);
+        UserCollapseCommand cmd3 = new UserCollapseCommand(userService, 97);
+        UserCollapseCommand cmd4 = new UserCollapseCommand(userService, 96);
+        Future<User> queue1 = cmd1.queue();
+        Future<User> queue2 = cmd2.queue();
+        Future<User> queue3 = cmd3.queue();
+        Future<User> queue4 = cmd4.queue();
+        User user1 = queue1.get();
+        User user2 = queue2.get();
+        User user3 = queue3.get();
+        User user4 = queue4.get();
+        System.out.println(user1);
+        System.out.println(user2);
+        System.out.println(user3);
+        System.out.println(user4);
+        ctx.close();
+    }
+```
+
+从控制台打印我们可以看到
+
+> 96,97,98,99
+
+四次请求被合在一起打印到了控制台上~如果想看出效果，可以使用延迟加载来实现。
+
+
+
+*注解形式配置*
+
+UserService.java
+
+```java
+@Service
+public class UserService
+{
+    @Autowired
+    RestTemplate restTemplate;
+
+    @HystrixCollapser(batchMethod = "getUserByIds", collapserProperties = {@HystrixProperty(name = "timerDelayInMilliseconds", value = "200")})
+    public Future<User> getUsersById(Integer id)
+    {
+        return null;
+    }
+
+    @HystrixCommand
+    public List<User> getUserByIds(List<Integer> ids)
+    {
+        User[] users = restTemplate.getForObject("http://provider/user/{1}", User[].class, StringUtils.join(ids, ','));
+        return Arrays.asList(users);
+    }
+}
+```
+
+测试方法
+
+```java
+    @GetMapping("/hello6")
+    public void hello6() throws ExecutionException, InterruptedException
+    {
+        HystrixRequestContext ctx = HystrixRequestContext.initializeContext();
+        Future<User> q1 = userService.getUsersById(99);
+        Future<User> q2 = userService.getUsersById(98);
+        Future<User> q3 = userService.getUsersById(97);
+        User user1 = q1.get();
+        User user2 = q2.get();
+        User user3 = q3.get();
+        System.out.println(user1);
+        System.out.println(user2);
+        System.out.println(user3);
+        Thread.sleep(2000);
+        Future<User> q4 = userService.getUsersById(97);
+        User user4 = q4.get();
+        System.out.println(user4);
+        ctx.close();
+    }
+```
+
+控制台打印结果：
+
+User{id=99, username='null', password='null'}
+User{id=98, username='null', password='null'}
+User{id=97, username='null', password='null'}
+2020-03-26 20:26:49.127  INFO 9264 --- [erListUpdater-0] c.netflix.config.ChainedDynamicProperty  : Flipping property: provider.ribbon.ActiveConnectionsLimit to use NEXT property: niws.loadbalancer.availabilityFilteringRule.activeConnectionsLimit = 2147483647
+User{id=97, username='null', password='null'}
+

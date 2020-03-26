@@ -11,6 +11,7 @@
         <module name="Commons" />
         <module name="Provider" />
         <module name="Consul-Provider" />
+        <module name="Hystrix" />
         <module name="Eureka" />
       </profile>
     </annotationProcessing>
@@ -21,6 +22,7 @@
       <module name="Consul-Provider" options="-parameters" />
       <module name="Consumer" options="-parameters" />
       <module name="Eureka" options="-parameters" />
+      <module name="Hystrix" options="-parameters" />
       <module name="Provider" options="-parameters" />
     </option>
   </component>

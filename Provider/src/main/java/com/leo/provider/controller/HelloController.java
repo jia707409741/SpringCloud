@@ -4,6 +4,8 @@ import com.leo.common.User;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Date;
+
 /**
  * @description:
  * @author: Leo
@@ -25,6 +27,7 @@ public class HelloController
     @GetMapping("/hello2")
     public String hello2(String name)
     {
+        System.out.println(new Date()+"--->"+name);
         return name;
     }
 
