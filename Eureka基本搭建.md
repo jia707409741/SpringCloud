@@ -1,3 +1,17 @@
+**SpringCloud基本入门知识**
+
+> GitHub地址： [https://github.com/jia707409741/SpringCloud](https://github.com/jia707409741/SpringCloud ) 
+
+QQ交流群：797156985
+
+如需破解jerbrant，请加群：272712006
+
+请关注公众号：窗前居士
+
+![我的公众号](Eureka基本搭建.assets/我的公众号-1585197700818.jpg)
+
+
+
 ## Eureka基本搭建
 
 一、创建一个普通的maven工程（最普通的那种），然后清除里面的src目录。
@@ -498,4 +512,156 @@ put接口传参其实和post很像也是支持kv形式传参和json形式传参
        restTemplate.delete("http://provider/deleteUser2/{1}",2);
     }
 ```
+
+
+
+## Consul安装
+
+一、去consul官网去下载Linux安装包，下载慢的可以加群找我，上面两个群号都可以。
+
+二、你可能要安装zip命令，如果你没有的话。
+
+命令： yum list | grep zip/unzip  #获取安装列表
+
+安装命令： yum install zip  #提示输入时，请输入y；
+
+安装命令：yum install unzip #提示输入时，请输入y；
+
+三、解压完成之后，进入consul目录启动
+
+> ./consul agent -dev -ui -node=consul-dev -client=192.168.5.218
+>
+> 最后放的是你自己虚拟机IP
+
+四、打开浏览器输入 http://192.168.5.218:8500/ ，看到界面显示说明完成。要关闭防火墙。
+
+![1585198498865](Eureka基本搭建.assets/1585198498865.png)
+
+## Consul使用
+
+### 服务提供端
+
+一、添加依赖
+
+```xml
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-consul-discovery</artifactId>
+        </dependency>
+```
+
+二、添加配置
+
+```properties
+spring.application.name=consul-provider
+server.port=8007
+spring.cloud.consul.host=192.168.5.218
+spring.cloud.consul.port=8500
+spring.cloud.consul.discovery.service-name=consul-provider
+```
+
+三、启动类上加上@EnableDiscoveryClient注解
+
+四、提供者代码
+
+```java
+@RestController
+public class HelloController
+{
+    @GetMapping("/hello")
+    public String hello(){
+        return "hello";
+    }
+}
+```
+
+最后启动服务
+
+![1585199317505](Eureka基本搭建.assets/1585199317505.png)
+
+### 服务消费端
+
+一、添加依赖
+
+```xml
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-consul-discovery</artifactId>
+        </dependency>
+```
+
+二、添加配置
+
+```properties
+spring.application.name=consul-provider
+server.port=8008
+spring.cloud.consul.host=192.168.5.218
+spring.cloud.consul.port=8500
+spring.cloud.consul.discovery.service-name=consul-provider
+```
+
+三、启动类上加上@EnableDiscoveryClient注解
+
+```java
+@SpringBootApplication
+@EnableDiscoveryClient
+public class ConsulConsumerApplication
+{
+    public static void main(String[] args)
+    {
+        SpringApplication.run(ConsulConsumerApplication.class, args);
+    }
+
+    @Bean
+    RestTemplate restTemplate()
+    {
+        return new RestTemplate();
+    }
+}
+```
+
+四、消费者调用
+
+```java
+@RestController
+public class HelloController
+{
+    @Autowired
+    LoadBalancerClient client;
+    @Autowired
+    RestTemplate restTemplate;
+
+    @GetMapping("/hello")
+    public void hello()
+    {
+        ServiceInstance choose = client.choose("consul-provider");
+        System.out.println(choose.getUri());
+        System.out.println(choose.getServiceId());
+        String s = restTemplate.getForObject(choose.getUri() + "/hello", String.class);
+        System.out.println(s);
+    }
+}
+```
+
+最后在浏览器输入： http://localhost:8008/hello 
+
+控制台打印成功：
+
+![1585201110514](Eureka基本搭建.assets/1585201110514.png)
 
