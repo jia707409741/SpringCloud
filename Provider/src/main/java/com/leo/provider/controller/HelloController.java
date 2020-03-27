@@ -1,9 +1,12 @@
 package com.leo.provider.controller;
 
 import com.leo.common.User;
+import leo.study.feign.IUserService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.Date;
 
 /**
@@ -13,18 +16,20 @@ import java.util.Date;
  * @version: 1.0
  */
 @RestController
-public class HelloController
+public class HelloController implements IUserService
 {
     @Value("${server.port}")
     Integer port;
 
-    @GetMapping("/hello")
+    @Override
+//    @GetMapping("/hello") 因为实现了接口，映射关系随着接口的实现被带过来了
     public String hello()
     {
         return "hello" + port;
     }
 
-    @GetMapping("/hello2")
+    @Override
+//    @GetMapping("/hello2")
     public String hello2(String name)
     {
         System.out.println(new Date()+"--->"+name);
@@ -37,7 +42,8 @@ public class HelloController
         return user;
     }
 
-    @PostMapping("/user2")
+//    @PostMapping("/user2")
+    @Override
     public User addUser2(@RequestBody User user)
     {
         return user;
@@ -61,9 +67,17 @@ public class HelloController
         System.out.println(id);
     }
 
-    @DeleteMapping("/deleteUser2/{id}")
+//    @DeleteMapping("/deleteUser2/{id}")
+    @Override
     public void deleteUser2(@PathVariable Integer id)
     {
         System.out.println(id);
+    }
+
+//    @GetMapping("/user3")
+    @Override
+    public void getUserByName(@RequestHeader String name) throws UnsupportedEncodingException
+    {
+        System.out.println(URLDecoder.decode(name, "UTF-8"));
     }
 }

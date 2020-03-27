@@ -41,7 +41,9 @@ eureka.client.fetch-registry=false
 
 > @EnableEurekaServer
 
-## Eureka服务注册
+## Eureka简单入门
+
+### Eureka服务注册
 
 右击工程名，添加新的SpringBoot模块`provider`
 
@@ -67,7 +69,7 @@ server.port=8003
 eureka.client.service-url.defaultZone=http://localhost:8001/eureka
 ```
 
-## 服务消费
+### Eureka服务消费
 
 首先在`provider`里添加一个接口
 
@@ -515,7 +517,9 @@ put接口传参其实和post很像也是支持kv形式传参和json形式传参
 
 
 
-## Consul安装
+## Consul简单入门
+
+### Consul安装
 
 一、去consul官网去下载Linux安装包，下载慢的可以加群找我，上面两个群号都可以。
 
@@ -537,9 +541,9 @@ put接口传参其实和post很像也是支持kv形式传参和json形式传参
 
 ![1585198498865](Eureka基本搭建.assets/1585198498865.png)
 
-## Consul使用
+### Consul使用
 
-### 服务提供端
+#### 服务提供端
 
 一、添加依赖
 
@@ -587,7 +591,7 @@ public class HelloController
 
 ![1585199317505](Eureka基本搭建.assets/1585199317505.png)
 
-### 服务消费端
+#### 服务消费端
 
 一、添加依赖
 
@@ -1144,4 +1148,458 @@ User{id=98, username='null', password='null'}
 User{id=97, username='null', password='null'}
 2020-03-26 20:26:49.127  INFO 9264 --- [erListUpdater-0] c.netflix.config.ChainedDynamicProperty  : Flipping property: provider.ribbon.ActiveConnectionsLimit to use NEXT property: niws.loadbalancer.availabilityFilteringRule.activeConnectionsLimit = 2147483647
 User{id=97, username='null', password='null'}
+
+## OpenFeign简单入门
+
+### HelloWorld
+
+一、添加依赖
+
+```properties
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+
+```
+
+二、配置文件，使项目注册到Eureka上
+
+```properties
+spring.application.name=openfeign
+server.port=7000
+eureka.client.service-url.defaultZone=http://localhost:8001/eureka
+```
+
+三、启动类上添加注解，开启对feign的支持
+
+@EnableFeignClients
+
+四、定义service接口
+
+```java
+@FeignClient("provider")//绑定服务，服务提供者的spring.application.name=provider
+public interface HelloService
+{
+    @GetMapping("/hello")
+    String hello();//定义一个方法名
+}
+```
+
+定义controller
+
+```java
+@RestController
+public class HelloController
+{
+    @Autowired
+    HelloService helloService;
+
+    @GetMapping("/hello")
+    public String hello(){
+        return helloService.hello();
+    }
+}
+
+```
+
+五、启动服务
+
+启动Eureka、Provider再启动Feign
+
+然后控制台输入： http://localhost:7000/hello 
+
+### OpenFeign参数传递
+
+和普通参数传递的区别
+
+> 1.参数要绑定参数名
+>
+> 2.如果通过header来传递参数，要记得中文转码
+
+一、测试接口
+
+```java
+@FeignClient("provider")//绑定服务
+public interface HelloService
+{
+    @GetMapping("/hello")
+    String hello();//定义一个方法名
+
+    @GetMapping("/hello2")
+    String hello2(@RequestParam("name") String name);
+
+    @PostMapping("/user2")
+    User addUser(@RequestBody User user);
+
+    @DeleteMapping("/deleteUser2/{id}")
+    void deleteUserById(@PathVariable("id") Integer id);
+
+    @GetMapping("/user3")
+    void getUserByName(@RequestHeader("name") String name);
+}
+
+```
+
+二、调用接口
+
+```java
+	@GetMapping("/hello2")
+    public String hello2() throws UnsupportedEncodingException
+    {
+        String s = helloService.hello2("leo");
+        System.out.println(s);
+        User user = new User();
+        user.setId(1);
+        user.setUsername("leo");
+        user.setPassword("123");
+        User user1 = helloService.addUser(user);
+        System.out.println(user1);
+        helloService.deleteUserById(1);
+        helloService.getUserByName(URLEncoder.encode("leo","UTF-8"));
+        return helloService.hello();
+    }
+```
+
+> Feign调用相比之前的RestTemplate，在代码上明显更加简洁、方便。Feign主要是通过Service接口绑定对应的远程服务，在接口上使用Mapping映射，这是最大的特点！至此，Service与服务提供者绑定后，控制器再进行调用！
+
+### OpenFeign继承特性
+
+将`provider`和`OpenFeign`中公共的部分提取出来，一起使用！
+
+一、首先创建一个普通的maven工程，这个工程需要web依赖和common模块的依赖
+
+```properties
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+            <version>2.2.5.RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>leo.study</groupId>
+            <artifactId>common</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+```
+
+二、创建公共接口
+
+```java
+public interface IUserService
+{
+    @GetMapping("/hello")
+    String hello();//定义一个方法名
+
+    @GetMapping("/hello2")
+    String hello2(@RequestParam("name") String name);
+
+    @PostMapping("/user2")
+    User addUser2(@RequestBody User user);
+
+    @DeleteMapping("/deleteUser2/{id}")
+    void deleteUser2(@PathVariable("id") Integer id);
+
+    @GetMapping("/user3")
+    void getUserByName(@RequestHeader("name") String name) throws UnsupportedEncodingException;
+}
+
+```
+
+三、把抽好的模块放到provider和OpenFeign里
+
+```properties
+<dependency>
+            <artifactId>feign-api</artifactId>
+            <groupId>leo.study</groupId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+```
+
+四、provider实现接口
+
+```java
+@RestController
+public class HelloController implements IUserService
+{
+    @Value("${server.port}")
+    Integer port;
+
+    @Override
+//    @GetMapping("/hello") 因为实现了接口，映射关系随着接口的实现被带过来了
+    public String hello()
+    {
+        return "hello" + port;
+    }
+
+    @Override
+//    @GetMapping("/hello2")
+    public String hello2(String name)
+    {
+        System.out.println(new Date()+"--->"+name);
+        return name;
+    }
+
+    @PostMapping("/user1")
+    public User addUser1(User user)
+    {
+        return user;
+    }
+
+//    @PostMapping("/user2")
+    @Override
+    public User addUser2(@RequestBody User user)
+    {
+        return user;
+    }
+
+    @PutMapping("/updateUser1")
+    public void updateUser1(User user)
+    {
+        System.out.println(user);
+    }
+
+    @PutMapping("/updateUser2")
+    public void updateUser2(@RequestBody User user)
+    {
+        System.out.println(user);
+    }
+
+    @DeleteMapping("/deleteUser1")
+    public void deleteUser1(Integer id)
+    {
+        System.out.println(id);
+    }
+
+//    @DeleteMapping("/deleteUser2/{id}")
+    @Override
+    public void deleteUser2(@PathVariable Integer id)
+    {
+        System.out.println(id);
+    }
+
+//    @GetMapping("/user3")
+    @Override
+    public void getUserByName(@RequestHeader String name) throws UnsupportedEncodingException
+    {
+        System.out.println(URLDecoder.decode(name, "UTF-8"));
+    }
+}
+```
+
+> `注意：` 因为实现了接口，映射关系随着接口的实现被带过来了，所以在重新继承之后，映射关系可以省略。
+
+五、`OpenFeign`继承公共模块`IUserService`
+
+只需要继承就可以！
+
+```java
+@FeignClient("provider")//绑定服务
+public interface HelloService extends IUserService
+{
+    /**
+     * author Leo
+     * date 2020/3/27
+
+    @GetMapping("/hello")
+    String hello();//定义一个方法名
+
+    @GetMapping("/hello2")
+    String hello2(@RequestParam("name") String name);
+
+    @PostMapping("/user2")
+    User addUser(@RequestBody User user);
+
+    @DeleteMapping("/deleteUser2/{id}")
+    void deleteUserById(@PathVariable("id") Integer id);
+
+    @GetMapping("/user3")
+    void getUserByName(@RequestHeader("name") String name);
+     */
+}
+```
+
+关于继承特性：代码简洁不容易出错
+
+### OpenFeign日志配置
+
+在OpenFeign中我们可以通过配置日志，来查看整个请求的调用，日志级别一共分为四种：
+
+- NONE：不开启日志，默认就是这个
+- BASIC：记录请求方法，URL，响应状态吗，执行时间
+- HEADERS：在BASIC基础上增加响应头
+- FULL：在HEADERS基础上，增加body以及请求元数据
+
+以上四种级别可以通过Bean来配置：
+
+```java
+@SpringBootApplication
+@EnableFeignClients
+public class OpenfeignApplication
+{
+    public static void main(String[] args)
+    {
+        SpringApplication.run(OpenfeignApplication.class, args);
+    }
+
+    @Bean
+    Logger.Level logLevel()
+    {
+        return Logger.Level.FULL;
+    }
+}
+
+```
+
+配置文件：
+
+```properties
+logging.level.com.leo.openfeign.HelloService=debug
+```
+
+### OpenFeign数据压缩
+
+```properties
+#开启请求数据压缩
+feign.compression.request.enabled=true
+#开启响应数据压缩
+feign.compression.response.enabled=true
+#压缩的数据类型
+feign.compression.request.mime-types=text/html,application/json
+#压缩的数据下限，2048表示当数据超过2048时才会进行压缩
+feign.compression.request.min-request-size=2048
+```
+
+### OpenFeign服务降级
+
+Hystrix里的容错、服务降级的功能，在OpenFeign里一样可以使用。
+
+一、定义一个HelloServiceFallBack实现HelloService，要加@Component注解
+
+```java
+@Component //添加该注解
+@RequestMapping("/leo") //防止请求地址重复
+public class HelloServiceFallBack implements HelloService
+{
+    @Override
+    public String hello()
+    {
+        return "error1";
+    }
+
+    @Override
+    public String hello2(String name)
+    {
+        return "error2";
+    }
+
+    @Override
+    public User addUser2(User user)
+    {
+        return null;
+    }
+
+    @Override
+    public void deleteUser2(Integer id)
+    {
+
+    }
+
+    @Override
+    public void getUserByName(String name) throws UnsupportedEncodingException
+    {
+
+    }
+}
+```
+
+HelloService里的@FeignClient注解里添加一个fallback属性，值：HelloServiceFallBack.class
+
+**但是这样会存在一个问题：**
+
+HelloServiceFallBack实现的是HelloService，而HelloService继承IUserService，而IUserService已经存在了一些映射方法
+
+![1585291532105](Eureka基本搭建.assets/1585291532105.png)
+
+这就相当于把相同的接口定义了两次，所以需要做一个区分。
+
+二、开启Hystrix：
+
+```properties
+feign.hystrix.enabled=true
+```
+
+三、启动：
+
+关闭`provider`，重启OpenFeign
+
+页面返回error1，说明成功！
+
+
+
+`或者可以自定义FallBackFactory来实现降级：`
+
+一、定义一个FallBackFactory
+
+```java
+@Component
+public class FallBackFactory implements FallbackFactory<HelloService>
+{
+    @Override
+    public HelloService create(Throwable throwable)
+    {
+        return new HelloService()
+        {
+            @Override
+            public String hello()
+            {
+                return "error--->1";
+            }
+
+            @Override
+            public String hello2(String name)
+            {
+                return "error--->2";
+            }
+
+            @Override
+            public User addUser2(User user)
+            {
+                return null;
+            }
+
+            @Override
+            public void deleteUser2(Integer id)
+            {
+
+            }
+
+            @Override
+            public void getUserByName(String name) throws UnsupportedEncodingException
+            {
+
+            }
+        };
+    }
+}
+
+```
+
+二、HelloService接口
+
+```java
+@FeignClient(value = "provider",fallbackFactory = FallBackFactory.class)//绑定服务HelloService
+```
+
+三、重启OpenFeign
+
+页面返回 error--->1 
 

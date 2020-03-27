@@ -6,10 +6,12 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
+        <module name="OpenFeign" />
         <module name="Consumer" />
         <module name="Consul-Consumer" />
         <module name="Commons" />
         <module name="Provider" />
+        <module name="Feign-Api" />
         <module name="Consul-Provider" />
         <module name="Hystrix" />
         <module name="Eureka" />
@@ -23,6 +25,7 @@
       <module name="Consumer" options="-parameters" />
       <module name="Eureka" options="-parameters" />
       <module name="Hystrix" options="-parameters" />
+      <module name="OpenFeign" options="-parameters" />
       <module name="Provider" options="-parameters" />
     </option>
   </component>
