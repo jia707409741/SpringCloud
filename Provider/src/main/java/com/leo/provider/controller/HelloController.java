@@ -1,6 +1,7 @@
 package com.leo.provider.controller;
 
 import com.leo.common.User;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import leo.study.feign.IUserService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
@@ -22,10 +23,14 @@ public class HelloController implements IUserService
     Integer port;
 
     @Override
+    @RateLimiter(name = "rLA")
 //    @GetMapping("/hello") 因为实现了接口，映射关系随着接口的实现被带过来了
     public String hello()
     {
-        return "hello" + port;
+//        int i=1/0;
+        String s="hello"+port;
+        System.out.println(new Date());
+        return s;
     }
 
     @Override

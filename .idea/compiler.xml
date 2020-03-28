@@ -8,13 +8,16 @@
         <outputRelativeToContentRoot value="true" />
         <module name="OpenFeign" />
         <module name="Consumer" />
+        <module name="Hystrix" />
         <module name="Consul-Consumer" />
-        <module name="Commons" />
+        <module name="Consul-Provider" />
+        <module name="Resilience4j" />
         <module name="Provider" />
         <module name="Feign-Api" />
-        <module name="Consul-Provider" />
-        <module name="Hystrix" />
+        <module name="MicroMeter" />
+        <module name="Commons" />
         <module name="Eureka" />
+        <module name="Resilience-Spring" />
       </profile>
     </annotationProcessing>
   </component>
@@ -25,8 +28,10 @@
       <module name="Consumer" options="-parameters" />
       <module name="Eureka" options="-parameters" />
       <module name="Hystrix" options="-parameters" />
+      <module name="MicroMeter" options="-parameters" />
       <module name="OpenFeign" options="-parameters" />
       <module name="Provider" options="-parameters" />
+      <module name="Resilience-Spring" options="-parameters" />
     </option>
   </component>
 </project>

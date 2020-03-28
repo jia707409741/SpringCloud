@@ -12,6 +12,8 @@
         <option value="$PROJECT_DIR$/Consul-Consumer/pom.xml" />
         <option value="$PROJECT_DIR$/Hystrix/pom.xml" />
         <option value="$PROJECT_DIR$/OpenFeign/pom.xml" />
+        <option value="$PROJECT_DIR$/Resilience-Spring/pom.xml" />
+        <option value="$PROJECT_DIR$/MicroMeter/pom.xml" />
       </list>
     </option>
   </component>

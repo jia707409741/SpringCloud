@@ -1603,3 +1603,488 @@ public class FallBackFactory implements FallbackFactory<HelloService>
 
 页面返回 error--->1 
 
+## Resilience4j
+
+### Resilience4j简介
+
+> 它是GreenWich版推荐的一个容错方案，相比Hystrix，Resilience4j专为Java8以及函数式编程设计的。
+
+Resilience4j提供功能：
+
+- 断路器
+- 限流
+- 基于信号量的隔离
+- 缓存
+- 限时
+- 请求重试
+
+### 断路器的使用
+
+一、添加依赖
+
+```xml
+		<dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.12</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-circuitbreaker</artifactId>
+            <version>0.13.2</version>
+        </dependency>
+```
+
+二、添加测试代码
+
+正常的例子
+
+```java
+public class ResilienceTest
+{
+    @Test
+    public void test1()
+    {
+        //注意，创建普通的maven工程，他的模块自带的jdk版本是5，你需要改成8
+        CircuitBreakerRegistry circuitBreakerRegistry = CircuitBreakerRegistry.ofDefaults();
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+                //故障率阈值百分比,一旦超过，断路器就会打开
+                .failureRateThreshold(50)
+                //断路器保持打开的时间，在达到设置时间之后，断路器会进入到一个半打开状态！
+                .waitDurationInOpenState(Duration.ofMillis(1000))
+                //当断路器处于半打开状态时，环形缓冲区的大小
+                .ringBufferSizeInHalfOpenState(2)
+                .ringBufferSizeInClosedState(2)
+                .build();
+
+        CircuitBreakerRegistry of = CircuitBreakerRegistry.of(config);
+        CircuitBreaker cb = of.circuitBreaker("leo", config);
+        CheckedFunction0<String> supplier = CircuitBreaker.decorateCheckedSupplier(cb, () -> "hello ResilienceTest");
+        Try<String> map = Try.of(supplier)
+                .map(v -> v + " hello");
+        System.out.println(map.isSuccess());
+        System.out.println(map.get());
+    }
+}
+
+```
+
+ 出异常的断路器
+
+```java
+    @Test
+    public void test2()
+    {
+        //注意，创建普通的maven工程，他的模块自带的jdk版本是5，你需要改成8
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+                //故障率阈值百分比,一旦超过，断路器就会打开
+                .failureRateThreshold(50)
+                //断路器保持打开的时间，在达到设置时间之后，断路器会进入到一个半打开状态！
+                .waitDurationInOpenState(Duration.ofMillis(1000))
+                //当断路器处于半打开状态时，环形缓冲区的大小
+//                .ringBufferSizeInHalfOpenState(2)
+                .ringBufferSizeInClosedState(2)
+                .build();
+
+        CircuitBreakerRegistry of = CircuitBreakerRegistry.of(config);
+        CircuitBreaker cb = of.circuitBreaker("leo");
+        System.out.println(cb.getState());
+        cb.onError(0,new RuntimeException());
+        System.out.println(cb.getState());
+        cb.onError(0,new RuntimeException());
+        System.out.println(cb.getState());
+        CheckedFunction0<String> supplier = CircuitBreaker.decorateCheckedSupplier(cb, () -> "hello ResilienceTest");
+        Try<String> map = Try.of(supplier)
+                .map(v -> v + " hello");
+        System.out.println(map.isSuccess());
+        System.out.println(map.get());
+    }
+```
+
+ringBufferSizeInClosedState(2)表示有两条数据时才会去统计故障率，所以手动测试时，至少调用两次onError，断路器才会打开！
+
+### RateLimiter限流
+
+防止某一时间请求流量过大，致使provider无法处理那么多请求，致使宕机。
+
+添加依赖：
+
+```xml
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-ratelimiter</artifactId>
+            <version>0.13.2</version>
+        </dependency>
+```
+
+
+
+限流测试代码：
+
+```java
+	@Test
+    public void test3()
+    {
+        RateLimiterConfig config = RateLimiterConfig.custom()
+                //阈值刷新时间
+                .limitRefreshPeriod(Duration.ofMillis(1000))
+                //阈值刷新频次
+                .limitForPeriod(2)
+                //冷却时间
+                .timeoutDuration(Duration.ofMillis(1000))
+                .build();
+        RateLimiter limiter = RateLimiter.of("leo", config);
+
+        CheckedRunnable checkedRunnable = RateLimiter.decorateCheckedRunnable(limiter, () ->
+        {
+            System.out.println(new Date());
+        });
+        Try.run(checkedRunnable)
+                .andThenTry(checkedRunnable)
+                .andThenTry(checkedRunnable)
+                .andThenTry(checkedRunnable)
+                .onFailure(t->{
+                    System.out.println(t.getMessage());
+                });
+    }
+```
+
+上面的例子，我们设置了每秒处理两次请求，而我们创建了4个任务实例，执行以后正常来说，打印出来的时间应该是两个不同的时间，间隔一秒
+
+```xml
+Fri Mar 27 16:30:08 CST 2020
+Fri Mar 27 16:30:08 CST 2020
+Fri Mar 27 16:30:09 CST 2020
+Fri Mar 27 16:30:09 CST 2020
+```
+
+### 请求重试
+
+一、添加依赖
+
+```xml
+       <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-retry</artifactId>
+            <version>0.13.2</version>
+        </dependency>
+```
+
+
+
+二、测试代码
+
+```java
+    @Test
+    public void test04(){
+        RetryConfig config = RetryConfig.custom()
+                //重试次数
+                .maxAttempts(5)
+                //间隔时间
+                .waitDuration(Duration.ofMillis(500))
+                //抛出哪个异常就进行重试
+                .retryExceptions(RuntimeException.class)
+                .build();
+        Retry of = Retry.of("leo", config);
+        Retry.decorateRunnable(of, new Runnable()
+        {
+            int count=0;
+            @Override
+            public void run()
+            {
+                if(count++ <3){
+                    throw new RuntimeException();
+                }
+            }
+        }).run();
+    }
+```
+
+### 结合微服务的Retry
+
+一、创建一个springboot工程，添加依赖
+
+```xml
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot2</artifactId>
+            <version>1.3.1</version>
+        </dependency>
+```
+
+排除目前不需要的依赖：
+
+```xml
+		<dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot2</artifactId>
+            <version>1.2.0</version>
+            <exclusions>
+                <!-- 没有配置的 需先排除 不然会报错 -->
+                <exclusion>
+                    <groupId>io.github.resilience4j</groupId>
+                    <artifactId>resilience4j-circuitbreaker</artifactId>
+                </exclusion>
+
+                <exclusion>
+                    <groupId>io.github.resilience4j</groupId>
+                    <artifactId>resilience4j-ratelimiter</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.github.resilience4j</groupId>
+                    <artifactId>resilience4j-bulkhead</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.github.resilience4j</groupId>
+                    <artifactId>resilience4j-timelimiter</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+```
+
+二、配置文件
+
+```properties
+resilience4j:
+  retry:
+    retry-aspect-order: 399 #表示Retry的优先级
+    backends:
+      retryA:
+        maxRetryAttempts: 5 #重试次数
+        waitDuration: 500 #重复等待时间
+        exponentialBackoffMultiplier: 1.1 #间隔乘数
+        retryExceptions:
+          - java.lang.RuntimeException
+spring:
+  application:
+    name: resilience4j
+server:
+  port: 7001
+eureka:
+  client:
+    service-url:
+      defaultZone:
+        http://localhost:8001/eureka
+```
+
+三、配置RestTemplate
+
+```java
+@SpringBootApplication
+public class ResilienceSpringApplication
+{
+    public static void main(String[] args)
+    {
+        SpringApplication.run(ResilienceSpringApplication.class, args);
+    }
+
+    @Bean
+    RestTemplate restTemplate(){
+        return new RestTemplate();
+    }
+}
+
+```
+
+四、业务代码
+
+HelloService
+
+```java
+@Service
+@Retry(name = "retryA")
+public class HelloService
+{
+    @Autowired
+    RestTemplate restTemplate;
+
+    public String hello(){
+        return restTemplate.getForObject("http://localhost:8003/hello",String.class);
+    }
+}
+
+```
+
+HelloController
+
+```java
+@RestController
+public class HelloController
+{
+    @Autowired
+    HelloService helloService;
+
+    @GetMapping("/hello")
+    public String hello(){
+        return helloService.hello();
+    }
+}
+```
+
+### 微服务的断路器
+
+一、首先要把依赖里排除circuitbreaker的删掉
+
+![1585370547818](Eureka基本搭建.assets/1585370547818.png)
+
+二、在配置文件中配置断路器
+
+```properties
+  circuitbreaker:
+    instances:
+      cbA:
+        ringBufferSizeInClosedState: 5
+        ringBufferSizeInHalfOpenState: 3
+        waitInterval: 5000
+        recordExpections:
+          - org.springframework.web.client.HttpServerErrorException
+    circuit-breaker-aspect-order: 398
+```
+
+三、HelloService添加注解
+
+```java
+@Service
+//@Retry(name = "retryA") //表示要使用重试策略
+@CircuitBreaker(name = "cbA",fallbackMethod = "error")
+public class HelloService
+{
+    @Autowired
+    RestTemplate restTemplate;
+
+    public String hello(){
+        return restTemplate.getForObject("http://localhost:8003/hello",String.class);
+    }
+
+    public String error(Throwable t){
+        return "error";
+    }
+}
+
+```
+
+> 这里要说明一下，定义的这个error方法里必须要放Throwable参数，即使你不想打印错误信息，也要放！
+
+浏览器输入： http://localhost:7001/hello 
+
+
+
+### 微服务中的限流
+
+一、首先要对`provider`里添加依赖
+
+```xml
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot2</artifactId>
+            <version>1.2.0</version>
+            <exclusions>
+                <!-- 没有配置的 需先排除 不然会报错 -->
+                <exclusion>
+                    <groupId>io.github.resilience4j</groupId>
+                    <artifactId>resilience4j-circuitbreaker</artifactId>
+                </exclusion>
+
+<!--                <exclusion>-->
+<!--                    <groupId>io.github.resilience4j</groupId>-->
+<!--                    <artifactId>resilience4j-ratelimiter</artifactId>-->
+<!--                </exclusion>-->
+                <exclusion>
+                    <groupId>io.github.resilience4j</groupId>
+                    <artifactId>resilience4j-bulkhead</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.github.resilience4j</groupId>
+                    <artifactId>resilience4j-timelimiter</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+```
+
+二、编写配置文件
+
+```properties
+spring.application.name=provider
+server.port=8003
+eureka.client.service-url.defaultZone=http://localhost:8001/eureka
+#设置一秒钟处理一个请求
+resilience4j.ratelimiter.limiters.rLA.limit-for-period=1
+#刷新时间
+resilience4j.ratelimiter.limiters.rLA.limit-refresh-period=1s
+#冷却时间
+resilience4j.ratelimiter.limiters.rLA.timeout-duration=1s
+
+```
+
+三、通过@RateLimiter注解标记接口实现限流
+
+```java
+    @Override
+    @RateLimiter(name = "rLA")
+//    @GetMapping("/hello") 因为实现了接口，映射关系随着接口的实现被带过来了
+    public String hello()
+    {
+//        int i=1/0;
+        String s="hello"+port;
+        System.out.println(new Date());
+        return s;
+    }
+```
+
+四、在客户端模拟多次请求，查看限流效果
+
+```java
+    public String hello()
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            restTemplate.getForObject("http://localhost:8003/hello", String.class);
+        }
+        return "success";
+    }
+```
+
+浏览器输入： http://localhost:7001/hello 
+
+控制台打印：
+
+![1585373253097](Eureka基本搭建.assets/1585373253097.png)
+
+### 服务监控
+
+微服务由于数量众多，出故障的概率很高，所以单纯依靠人来运维。在早期的springcloud，服务监控主要使用Hystrix DashBoard，集群数据库监控使用Turbine
+
+在G版，官方推荐使用的是MicroMeter
+
+一、添加依赖
+
+```xml
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+```
+
+二、配置文件
+
+```properties
+management.endpoints.web.exposure.include=*
+```
+
+三、启动服务，查看运行数据
+
+![1585374663622](Eureka基本搭建.assets/1585374663622.png)
+
