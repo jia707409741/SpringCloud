@@ -16,8 +16,9 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId></groupId>
-                <artifactId>resilience4j</artifactId>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-spring-boot2</artifactId>
+                <version>1.2.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

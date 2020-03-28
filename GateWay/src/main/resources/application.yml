@@ -1,0 +1,25 @@
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: leo_route
+          # uri: http://httpbin.org
+          uri: lb://provider # lb LoadBalance,在多个实例场景下，自动实现负载均衡
+          filters:
+            - AddRequestParameter=name,leo
+          predicates:
+            - Method=/get
+      # - After=2021-01-01T01:01:01+08:00[Asia/Shanghai]
+      discovery:
+        locator:
+          enabled: true #开启自动代理
+  application:
+    name: gateway
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8001/eureka
+logging:
+  level:
+    org.springframework.cloud.gateway: debug

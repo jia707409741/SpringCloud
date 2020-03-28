@@ -14,6 +14,8 @@
         <option value="$PROJECT_DIR$/OpenFeign/pom.xml" />
         <option value="$PROJECT_DIR$/Resilience-Spring/pom.xml" />
         <option value="$PROJECT_DIR$/MicroMeter/pom.xml" />
+        <option value="$PROJECT_DIR$/Zuul/pom.xml" />
+        <option value="$PROJECT_DIR$/GateWay/pom.xml" />
       </list>
     </option>
   </component>

@@ -2088,3 +2088,307 @@ management.endpoints.web.exposure.include=*
 
 ![1585374663622](Eureka基本搭建.assets/1585374663622.png)
 
+
+
+## Zuul
+
+> 由于每个微服务地址都有可能发生变化，无法直接对外公布这些地址，基于安全、高内聚低耦合等设计，我们都要对内外部系统做一个切割，一个专门用来处理请求的组件。
+
+- 权限问题统一处理
+- 数据裁剪和聚合
+- 简化客户端调用
+- 可以针对不同的客户提供不同的网关支持
+
+### Zuul功能
+
+- 权限控制，可以做认证和授权
+- 监控
+- 动态路由
+- 负载均衡
+- 静态资源处理
+
+Zuul中的功能基本上是基于过滤器来实现的，他的过滤器有几种不同的类型：
+
+- PRE
+- ROUTING
+- POST
+- ERROR
+
+### 简单入门
+
+一、添加依赖
+
+```xml
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-zuul</artifactId>
+        </dependency>
+```
+
+二、添加配置
+
+```properties
+spring.application.name=zuul
+server.port=8012
+eureka.client.service-url.defaultZone=http://localhost:8001/eureka
+
+```
+
+三、启动类添加注解@EnableZuulProxy
+
+启动Eureka、Provider、Zuul，然后浏览器输入： http://localhost:8012/provider/hello 
+
+路由规则自己配置：
+
+```properties
+zuul.routes.cloud-a.path=/cloud-a/**
+zuul.routes.cloud-a.service-id=provider
+```
+
+简化的话就是：
+
+```properties
+zuul.routes.provider=/cloud-a/**
+```
+
+### 请求过滤
+
+```java
+@Component
+public class PerMissFilter extends ZuulFilter
+{
+    //过滤器类型
+    @Override
+    public String filterType()
+    {
+        return "pre";
+    }
+
+    //过滤器优先级
+    @Override
+    public int filterOrder()
+    {
+        return 0;
+    }
+
+    //是否过滤
+    @Override
+    public boolean shouldFilter()
+    {
+        return true;
+    }
+
+    //核心过滤逻辑
+    @Override
+    public Object run() throws ZuulException
+    {
+        RequestContext ctx = RequestContext.getCurrentContext();
+        HttpServletRequest request = ctx.getRequest();//获取当前请求
+        String name = request.getParameter("name");
+        String password = request.getParameter("password");
+        if(!"leo".equals(name)||!"123".equals(password)){
+            ctx.setSendZuulResponse(false);
+            ctx.setResponseStatusCode(401);
+            ctx.addZuulResponseHeader("content-type","text/html;charset=utf-8");
+            ctx.setResponseBody("非法访问！");
+        }
+        return null;
+    }
+}
+
+```
+
+简单定义过滤器，继承ZuulFilter，重写里面方法
+
+## GateWay
+
+**特点：**
+
+- 限流
+- 路径重写
+- 动态路由
+- 集成SpringCloud DiscoveryClient
+- 集成断路器
+
+**和Zuul对比：**
+
+1. 对比之下，gateway可以和其他组件更好融合。
+2. Zuul1不支持长连接，例如websocket
+3. 支持限流
+4. gateway基于netty开发，实现了异步和非阻塞，占用资源小，性能强于Zuul
+
+### 基本入门
+
+SpringCloud Gateway支持编程式配置和yml配置
+
+`编程式配置`
+
+一、创建一个springboot项目，添加gateway依赖
+
+```xml
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-gateway</artifactId>
+        </dependency>
+```
+
+二、配置RouteLocator这个Bean，实现请求转发
+
+```java
+@SpringBootApplication
+public class GatewayApplication
+{
+    public static void main(String[] args)
+    {
+        SpringApplication.run(GatewayApplication.class, args);
+    }
+
+    @Bean
+    RouteLocator routeLocator(RouteLocatorBuilder builder)
+    {
+        return builder.routes()
+                .route("leo_route", r -> r.path("/get").uri("http://httpbin.org"))
+                .build();
+    }
+}
+```
+
+三、重启项目，访问 http://localhost:8080/get ，同样会转发到http://httpbin.org/get
+
+
+
+`yml配置`
+
+```properties
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: leo_route
+          uri: http://httpbin.org
+          predicates:
+            - Path=/get
+```
+
+properties配置
+
+```properties
+spring.cloud.gateway.routes[0].id=leo_route
+spring.cloud.gateway.routes[0].uri=http://httpbin.org
+spring.cloud.gateway.routes[0].predicates[0]=Path=/get
+```
+
+重启服务！
+
+### 结合微服务
+
+一、增加yml配置
+
+```properties
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: leo_route
+          uri: http://httpbin.org
+          predicates:
+            - Path=/get
+      discovery:
+        locator:
+          enabled: true #开启自动代理
+  application:
+    name: gateway
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8001/eureka
+logging:
+  level:
+    org.springframework.cloud.gateway: debug
+
+```
+
+把gateway注册到注册中心，然后去调用注册中心的其他服务
+
+ http://localhost:8080/PROVIDER/hello ，这个PROVIDER要和服务中心上的`名字一致，包括大小写`。
+
+### Predicate
+
+**通过时间匹配**
+
+```properties
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: leo_route
+          uri: http://httpbin.org
+          predicates:
+            - After=2021-01-01T01:01:01+08:00[Asia/Shanghai]
+```
+
+表示请求时间在2021-01-01T01:01:01+08:00[Asia/Shanghai]之后才会被路由，否则不会被路由。
+
+*- Before* 表示在某个时间之前，进行转发
+
+*- Between* 表示在两个时间点之间，用英文逗号隔开
+
+**通过请求方式匹配**
+
+*- Method=*GET  表示只处理GET请求，其他请求不做处理！
+
+**通过请求路径匹配**
+
+**通过传入参数匹配**
+
+*- Query=*name
+
+表示请求里要有name属性才会转发，否则不做处理！
+
+**通过传入参数和传入值匹配**
+
+*- Query=*name,leo.*
+
+表示传入参数为name，值为leo***，他的传入参数值必须符合这种格式，才会转发
+
+多种方式可以组合使用
+
+### Filter
+
+SpringCloud GateWay中的过滤器分为两大类
+
+- GlobalFilter
+- GateWayFilter
+
+AddRequestParameter过滤器使用
+
+```properties
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: leo_route
+          # uri: http://httpbin.org
+          uri: lb://provider # lb LoadBalance,在多个实例场景下，自动实现负载均衡
+          filters:
+            - AddRequestParameter=name,leo
+          predicates:
+            - Method=/get
+```
+
+浏览器输入： http://localhost:8080/hello2 
+
+返回输入的value
+
+这里不需要手动去写provider，原因是配置文件里url已经写了
+
+这个过滤器就是在请求转发路由的时候，自动额外添加参数

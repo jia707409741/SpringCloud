@@ -6,18 +6,20 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="OpenFeign" />
-        <module name="Consumer" />
-        <module name="Hystrix" />
-        <module name="Consul-Consumer" />
+        <module name="GateWay" />
         <module name="Consul-Provider" />
-        <module name="Resilience4j" />
-        <module name="Provider" />
-        <module name="Feign-Api" />
-        <module name="MicroMeter" />
         <module name="Commons" />
-        <module name="Eureka" />
+        <module name="Consumer" />
         <module name="Resilience-Spring" />
+        <module name="Resilience4j" />
+        <module name="Zuul" />
+        <module name="MicroMeter" />
+        <module name="Consul-Consumer" />
+        <module name="OpenFeign" />
+        <module name="Provider" />
+        <module name="Hystrix" />
+        <module name="Feign-Api" />
+        <module name="Eureka" />
       </profile>
     </annotationProcessing>
   </component>
@@ -27,11 +29,13 @@
       <module name="Consul-Provider" options="-parameters" />
       <module name="Consumer" options="-parameters" />
       <module name="Eureka" options="-parameters" />
+      <module name="GateWay" options="-parameters" />
       <module name="Hystrix" options="-parameters" />
       <module name="MicroMeter" options="-parameters" />
       <module name="OpenFeign" options="-parameters" />
       <module name="Provider" options="-parameters" />
       <module name="Resilience-Spring" options="-parameters" />
+      <module name="Zuul" options="-parameters" />
     </option>
   </component>
 </project>
