@@ -4,7 +4,9 @@
 
 QQ交流群：797156985
 
-如需破解jerbrant，请加群：272712006
+如需破解jerbrant全家桶，请加群：272712006
+
+破解网址： https://www.jianshu.com/p/133af2e4fe3f 
 
 请关注公众号：窗前居士
 
@@ -164,7 +166,7 @@ public class UserController
         final int port = serviceInstance.getPort();//端口名
         try
         {
-            final StringBuffer stringBuffer = new StringBuffer();
+            StringBuffer stringBuffer = new StringBuffer();
             stringBuffer.append("http://")
                     .append(host)
                     .append(":")
@@ -340,11 +342,11 @@ public class HelloController
     @GetMapping("/hello4")
     public void hello4()
     {
-        final String s = restTemplate.getForObject("http://provider/hello2?name={1}",
+        String s = restTemplate.getForObject("http://provider/hello2?name={1}",
                 String.class,"leo");
         System.out.println(s);
-        final ResponseEntity<String> s1 = restTemplate.getForEntity("http://provider/hello2?name={1}",String.class, "leo");
-        final String body = s1.getBody();
+        ResponseEntity<String> s1 = restTemplate.getForEntity("http://provider/hello2?name={1}",String.class, "leo");
+        String body = s1.getBody();
         System.out.println(body);
         final HttpStatus statusCode = s1.getStatusCode();
         System.out.println(statusCode);
@@ -2392,3 +2394,507 @@ spring:
 这里不需要手动去写provider，原因是配置文件里url已经写了
 
 这个过滤器就是在请求转发路由的时候，自动额外添加参数
+
+## SpringCloud Config
+
+### 简介
+
+它是一个分布式系统配置管理解决方案，它包含了Client和Server。配置文件放在server端，通过接口的形式提供给client。
+
+SpringCloud Config主要有哪些功能：
+
+- 集中管理各个环境、微服务的配置文件
+- 提供服务端和客户端的支持
+- 配置文件修改后，快速生效
+- 配置文件通过Git或者SVN进行管理，天然支持版本回退。
+- 支持高并发，支持多种开发语言
+
+### 准备配置文件
+
+一、本地创建目录，然后创建三个properties配置文件(最好和我的操作保持一致)
+
+![1585458744497](Eureka基本搭建.assets/1585458744497.png)
+
+![1585458765008](Eureka基本搭建.assets/1585458765008.png)
+
+二、在GitHub上创建一个远程仓库，把client1文件上传，这里的话具体步骤就不说了
+
+![1585458828998](Eureka基本搭建.assets/1585458828998.png)
+
+### 搭建ConfigServer环境
+
+一、首先创建一个ConfigServer工程，创建时添加ConfigServer依赖
+
+```xml
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-config-server</artifactId>
+        </dependency>
+```
+
+二、配置文件
+
+```properties
+server.port=7002
+spring.application.name=config-server
+#配置仓库地址
+spring.cloud.config.server.git.uri=https://github.com/jia707409741/configResp.git
+#仓库中，配置文件目录
+spring.cloud.config.server.git.search-paths=client1
+
+```
+
+三、启动类添加注解@EnableConfigServer
+
+四、浏览器输入： http://localhost:7002/client1/dev/master 
+
+访问规则：
+
+/{application}/{profile}/[{label}]
+
+/{application}-{profile}.yml
+
+/{application}-{profile}.properties
+
+/{label}/{application}-{profile}.yml
+
+/{label}/{application}-{profile}.properties
+
+### 搭建ConfigClient环境
+
+一、添加依赖
+
+```xml
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-config</artifactId>
+        </dependency>
+```
+
+二、添加bootstrap.properties
+
+```properties
+#下面三行配置分别对应config-server中的{application}/{profile}以及{label}占位符
+spring.application.name=client1
+spring.cloud.config.profile=dev
+spring.cloud.config.label=master
+spring.cloud.config.uri=http://localhost:7002
+server.port=7003
+```
+
+三、启动，浏览器输入： http://localhost:7003/hello 
+
+
+
+### 配置文件加密
+
+**常见加密方案：**
+
+*可逆加密*
+
+可以根据加密后的明文可以推断出明文加密方式：
+
+1.对称加密
+
+​	加密与解密的秘钥不一样，加密叫做公钥，解密叫做私钥
+
+2.非对称加密
+
+*不可逆加密*
+
+​	理论上，无法通过加密后的密文推算出明文。
+
+## SpringCloud Stream
+
+### 环境搭建
+
+一、添加依赖
+
+```xml
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-stream</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-stream-binder-rabbit</artifactId>
+        </dependency>
+```
+
+二、配置文件
+
+```properties
+spring.rabbitmq.host=39.101.197.96
+spring.rabbitmq.port=5672
+spring.rabbitmq.username=guest
+spring.rabbitmq.password=guest
+
+```
+
+三、编写接收器
+
+```java
+@EnableBinding(Sink.class)
+public class MsgReceiver
+{
+    @StreamListener(Sink.INPUT)
+    public void receive(Object payload)
+    {
+        System.out.println("receive: " + payload);
+    }
+}
+```
+
+四、启动项目
+
+启动项目，并且进入rabbitmq后台管理页面里发送一条消息；
+
+![1587451271836](Eureka基本搭建.assets/1587451271836.png)
+
+然后进去控制台看是否存在消息
+
+![1587451292198](Eureka基本搭建.assets/1587451292198.png)
+
+### 自定义消息通道
+
+一、自定义接口
+
+```java
+public interface MyChannel
+{
+    String INPUT="leo-INPUT";
+    String OUTPUT="leo-OUTPUT";
+
+    @Output(OUTPUT)
+    MessageChannel output();
+
+    @Input(INPUT)
+    SubscribableChannel input();
+}
+```
+
+二、自定义控制器
+
+```java
+@EnableBinding(MyChannel.class)
+public class CustomReceiver
+{
+    @StreamListener(MyChannel.INPUT)
+    public void receive(Object payload){
+        System.out.println("receive "+payload);
+    }
+}
+
+```
+
+三、定义控制器
+
+```java
+@RestController
+public class HelloController
+{
+    @Autowired
+    MyChannel myChannel;
+
+    @GetMapping("/hello")
+    public void hello(){
+        myChannel.output().send(MessageBuilder.withPayload("hello,controller").build());
+    }
+}
+
+```
+
+### 消息分组
+
+简单一个配置
+
+```properties
+spring.cloud.stream.bindings.leo-INPUT.group=g1
+spring.cloud.stream.bindings.leo-OUTPUT.group=g1
+
+```
+
+### 消息分区
+
+简单配置
+
+```properties
+#开启消息分区(输入通道上)
+spring.cloud.stream.bindings.leo-INPUT.consumer.partitioned=true
+#消费者实例个数
+spring.cloud.stream.instance-count=2
+#当前实例的下标
+spring.cloud.stream.instance-index=0
+#这个表示这个消息将被下标为1的消费者所消费
+spring.cloud.stream.bindings.leo-OUTPUT.producer.partition-key-expression=1
+#消费者的节点数量（生产者上配置）
+spring.cloud.stream.bindings.leo-OUTPUT.producer.partition-count=1
+```
+
+## SpringCloud Sleuth
+
+### 环境搭建
+
+一、添加依赖
+
+```xml
+ 		<dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-sleuth</artifactId>
+        </dependency>
+```
+
+
+
+二、写控制器
+
+```java
+package com.example.sleuth.controller;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class HelloController
+{
+    public static final Log log = LogFactory.getLog(HelloController.class);
+
+    @GetMapping("/hello")
+    public String hello()
+    {
+        log.info("hello");
+        return "hello";
+    }
+}
+
+```
+
+三、请求结果打印
+
+2020-05-02 15:58:43.542  INFO [,4f7b6b12b746eecc,4f7b6b12b746eecc,false] 11240 --- [nio-8080-exec-1] c.e.sleuth.controller.HelloController    : hello
+
+### 代码改造
+
+一、配置文件里添加
+
+```properties
+spring.application.name=sleuth
+```
+
+二、controller改造
+
+```java
+package com.example.sleuth.controller;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+@RestController
+public class HelloController
+{
+    public static final Log log = LogFactory.getLog(HelloController.class);
+
+    @Autowired
+    RestTemplate restTemplate;
+
+    @GetMapping("/hello")
+    public String hello()
+    {
+        log.info("hello");
+        return "hello";
+    }
+
+    @GetMapping("/hello2")
+    public String hello2() throws InterruptedException
+    {
+        log.info("hello2");
+        Thread.sleep(1000);
+        return restTemplate.getForObject("http://localhost:8080/hello3",String.class);
+    }
+
+    @GetMapping("/hello3")
+    public String hello3() throws InterruptedException
+    {
+        log.info("hello3");
+        Thread.sleep(1000);
+        return "hello3";
+    }
+}
+```
+
+三、运行hello2看控制台打印
+
+![1588407169296](Eureka基本搭建.assets/1588407169296.png)
+
+一个trace由多个span组成
+
+### 异步任务信息收集
+
+一、启动类上添加注解@EnableAsync
+
+```java
+package com.example.sleuth;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.web.client.RestTemplate;
+
+@SpringBootApplication
+@EnableAsync
+public class SleuthApplication
+{
+    public static void main(String[] args)
+    {
+        SpringApplication.run(SleuthApplication.class, args);
+    }
+
+    @Bean
+    RestTemplate restTemplate(){
+        return new RestTemplate();
+    }
+}
+
+```
+
+二、添加service
+
+```java
+package com.example.sleuth.service;
+
+import com.example.sleuth.controller.HelloController;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
+@Service
+public class HelloService
+{
+    public static final Log log = LogFactory.getLog(HelloService.class);
+
+    @Async
+    public String backgroundFun()
+    {
+        log.info("backgroundFun");
+        return "backgroundFun";
+    }
+}
+
+```
+
+三、controller
+
+```java
+    @GetMapping("/hello4")
+    public String hello4(){
+        log.info("hello4");
+        return helloService.backgroundFun();
+    }
+```
+
+四、控制台打印
+
+![1588407726725](Eureka基本搭建.assets/1588407726725.png)
+
+## ZipKin
+
+### 环境搭建
+
+需要有docker环境，如果没有请看我博客： https://blog.csdn.net/Curtisjia/article/details/104186314 
+
+一、安装ElasticSearch，通过docker安装
+
+> docker run -d --name elasticsearch -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" elasticsearch:7.1.0
+
+二、安装rabbitmq
+
+> docker run -d --hostname my-rabbit --name leo-rabbit -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+
+三、安装zipkin
+
+> docker run -d -p 9411:9411 --name zipkin -e ES_HOSTS=192.168.0.118 -e STORAGE_TYPE=elasticsearch -e ES_HTTP_LOGGING=BASIC -e RABBIT_URI=amqp://guest:guest@192.168.0.118:5672 openzipkin/zipkin
+
+进入zipkin：
+
+![1588412534150](Eureka基本搭建.assets/1588412534150.png)
+
+### 项目创建
+
+一、添加依赖
+
+![1588412925343](Eureka基本搭建.assets/1588412925343.png)
+
+二、配置文件
+
+```properties
+spring.application.name=zipkin01
+#开启链路追踪
+spring.sleuth.web.client.enabled=true
+#配置采样比例
+spring.sleuth.sampler.probability=1
+#zipkin地址
+spring.zipkin.base-url=http://192.168.0.118:9411
+#开启zipkin
+spring.zipkin.enabled=true
+#追踪消息发送类型
+spring.zipkin.sender.type=rabbit
+
+spring.rabbitmq.host=192.168.0.118
+spring.rabbitmq.port=5672
+spring.rabbitmq.username=guest
+spring.rabbitmq.password=guest
+
+```
+
+三、controller
+
+```java
+package com.example.zipkin01;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class HelloController
+{
+    public static final Log log= LogFactory.getLog(HelloController.class);
+
+    @GetMapping("/hello")
+    public String hello(String name){
+        log.info("zipkin01 hello!");
+        return "hello"+name;
+    }
+}
+
+```
+

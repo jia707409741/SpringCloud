@@ -1,16 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/Config-Client" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Config-Client/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Config-Server" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Config-Server/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/Consul-Consumer" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Consul-Consumer/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/Consul-Provider" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Consul-Provider/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/Consumer" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Consumer/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/Eureka" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Eureka/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/GateWay" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/GateWay/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/Hystrix" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Hystrix/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/MicroMeter" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/MicroMeter/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/OpenFeign" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/OpenFeign/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/Provider" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Provider/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/Resilience-Spring" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Resilience-Spring/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Sleuth/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Stream/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Zipkin01/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Zipkin02/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/Zuul" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Zuul/src/main/java" charset="UTF-8" />
   </component>
 </project>
